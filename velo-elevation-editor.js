@@ -137,22 +137,31 @@ function show_elevation_data(req, res, file_id) {
 		}
 				
 	    parser.parseString(data, function (err, result) {
-	        console.dir(result);
-	        console.log('Done');
 	        var tcd = result.TrainingCenterDatabase;
-	       // res.write('\TCD: ' + util.inspect(tcd));
-	        for (var a = 0; a < tcd.Activities.length; a++) {
-	        	var activity = tcd.Activities[a].Activity[0];
-	        	res.write('\nActivity: ' + activity.Id + " --> " +  util.inspect(activity));
-	        	
-	        	for (var l = 0; l < activity.Lap.length; l++) {
-		        	var lap = activity.Lap[l];
-		        	res.write('\Lap: ' + util.inspect(lap));
-	       		 }
-	        	
+	        if (!tcd || tcd.Activities.length != 1) {
+	          showError(req, res, 400, "Uploaded file must contain one and only one activity.");
+	          return;
 	        }
 	        
-	         res.end();
+	        var activity = tcd.Activities[0].Activity[0];
+	        res.write('\nActivity: ' + activity.Id);
+	        var track_points = [];
+	        var count = 0;
+        	for (var l = 0; l < activity.Lap.length; l++) {
+	        	var lap = activity.Lap[l];
+	        	var points = lap.Track[0].Trackpoint;
+	        	for (var tck = 0; tck < points.length; tck++) {
+	        		track_points[count++] = points[tck];
+	        	}
+       		}
+       		
+       		for (var p = 0; p < track_points.length; p++) {
+       		    var distance = track_points[p].DistanceMeters;
+       		    var elevation = track_points[p].AltitudeMeters;
+       			res.write(distance + " > " + elevation + 'm\n');
+       		}
+	        
+	        res.end();
 	    });
 	});
 }
