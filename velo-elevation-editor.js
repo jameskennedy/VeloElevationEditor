@@ -31,7 +31,10 @@ var server = http.createServer(function (request, response) {
   
   display_form(request, response);
   
-}).listen(PORT, HOST);
+})
+
+sys.debug("Server: " + server);
+server.listen(PORT, HOST);
 
 console.log('Server running at http://' + HOST + ':' + PORT + '/');
 
