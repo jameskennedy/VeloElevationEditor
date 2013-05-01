@@ -4,7 +4,7 @@
   "description": "An editor for adjusting route elevation data.",
   "main": "velo-elevation-editor.js",
   "scripts": {
-    "start": "velo-elevation-editor.js"
+    "start": "./velo-elevation-editor.js"
   },
   "repository": "",
   "keywords": [
@@ -12,7 +12,7 @@
     "Eclipse",
     "Nodeclipse"
   ],
-  "author": "",
+  "author": "jk-public@hunterkennedy.ca",
   "license": "BSD",
   "readmeFilename": "README.md",
   "dependencies": {
