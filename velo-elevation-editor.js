@@ -1,6 +1,7 @@
 var http = require('http');
 var url = require('url');
 var sys = require("sys");
+var path = require('path')
 var formidable = require('formidable');
 var util = require('util');
 var fs = require('fs');
@@ -13,6 +14,15 @@ var PORT = 8080;
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
 var UPLOAD_DIR = 'uploads';
+
+var mimeTypes = {
+    "html": "text/html",
+    "jpeg": "image/jpeg",
+    "jpg": "image/jpeg",
+    "png": "image/png",
+    "js": "text/javascript",
+    "css": "text/css",
+    "tcx": "application/xml"};
 
 // Clean-up uploads dir
 fs.exists(UPLOAD_DIR, function (exists) {
@@ -41,9 +51,14 @@ var server = http.createServer(function (request, response) {
   	return;
   }
   
-  if (pathName.indexOf('/uploads') === 0) {
+  if (pathName.indexOf('/uploads/') === 0) {
     var file_id = pathName.substring(UPLOAD_DIR.length + 2);
   	show_elevation_data(request, response, file_id);
+  	return;
+  }
+  
+  if (pathName.indexOf('/resources/') === 0) {
+  	serve_static_resource(request, response);
   	return;
   }
   
@@ -55,7 +70,7 @@ var server = http.createServer(function (request, response) {
 server.listen(PORT, HOST);
 
 
-// ==============================================================================================
+// =============================================================================================
 
 function handleSimpleElevationRequest(request, response, location) {
   if (!location) {
@@ -139,7 +154,7 @@ function show_elevation_data(req, res, file_id) {
 	    parser.parseString(data, function (err, result) {
 	        var tcd = result.TrainingCenterDatabase;
 	        if (!tcd || tcd.Activities.length != 1) {
-	          showError(req, res, 400, "Uploaded file must contain one and only one activity.");
+	          show_error(req, res, 400, "Uploaded file must contain one and only one activity.");
 	          return;
 	        }
 	        
@@ -169,7 +184,7 @@ function show_elevation_data(req, res, file_id) {
 
 function display_form(req, res) {
     res.writeHead(200, {"Content-Type": "text/html"});
-    res.write('<h1>Velo Eelvation Editor</h1>');
+    res.write('<h1>Velo Eelevation Editor</h1>');
     res.write(
         'Enter GPS coordinates to get Google\'s elevation data.' +
         '<form action="/" method="get">'+
@@ -184,7 +199,28 @@ function display_form(req, res) {
         '<input type="submit" value="Upload">'+
         '</form>'
     );
+    res.write('<p>Here is a <a href="resources/sample_activity_300717555.tcx">sample TCX file</a> you can upload.</p>');
     res.end();
+}
+
+function serve_static_resource(req, res) {
+	var uri = url.parse(req.url).pathname;
+    var filename = path.join(process.cwd(), uri);
+    path.exists(filename, function(exists) {
+        if(!exists) {
+            console.log("not exists: " + filename);
+            res.writeHead(404, {'Content-Type': 'text/plain'});
+            res.write('404 Not Found\n');
+            res.end();
+            return;
+        }
+        
+        var mimeType = mimeTypes[path.extname(filename).split(".")[1].toLowerCase()];
+        res.writeHead(200, mimeType);
+
+        var fileStream = fs.createReadStream(filename);
+        fileStream.pipe(res);
+    });
 }
 
 
