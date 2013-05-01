@@ -13,7 +13,6 @@ var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
 
 var server = http.createServer(function (request, response) {
-  return;
 
   response.writeHead(200, {'Content-Type': 'text/plain'});
   
