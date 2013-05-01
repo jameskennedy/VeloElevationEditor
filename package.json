@@ -4,8 +4,7 @@
   "description": "An editor for adjusting route elevation data.",
   "main": "velo-elevation-editor.js",
   "scripts": {
-    "start": "./velo-elevation-editor.js",
-    "test": "echo \"Error: no test specified! Configure in package.json\" && exit 1"
+    "start": "./velo-elevation-editor.js"
   },
   "repository": "",
   "keywords": [
