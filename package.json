@@ -2,8 +2,9 @@
   "name": "VeloElevationEditor",
   "version": "0.1.0",
   "description": "An editor for adjusting route elevation data.",
-  "main": "elevation-adjuster-server.js",
+  "main": "velo-elevation-editor.js",
   "scripts": {
+    "start": "./velo-elevation-editor.js"
     "test": "echo \"Error: no test specified! Configure in package.json\" && exit 1"
   },
   "repository": "",
