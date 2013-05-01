@@ -206,12 +206,9 @@ function display_form(req, res) {
 function serve_static_resource(req, res) {
 	var uri = url.parse(req.url).pathname;
     var filename = path.join(process.cwd(), uri);
-    path.exists(filename, function(exists) {
+    fs.exists(filename, function(exists) {
         if(!exists) {
-            console.log("not exists: " + filename);
-            res.writeHead(404, {'Content-Type': 'text/plain'});
-            res.write('404 Not Found\n');
-            res.end();
+            show_error(req,res,404,"404 Not Found");
             return;
         }
         
