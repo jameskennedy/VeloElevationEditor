@@ -5,16 +5,27 @@ var formidable = require('formidable');
 var util = require('util');
 var fs = require('fs');
 var xml2js = require("xml2js");
+var rimraf = require("rimraf");
 
 var HOST = 'localhost';
 var PORT = 8080;
 
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
+var UPLOAD_DIR = 'uploads';
+
+// Clean-up uploads dir
+fs.exists(UPLOAD_DIR, function (exists) {
+  if (exists) {
+	rimraf(UPLOAD_DIR, function(error) {
+		if (error) {
+			sys.error(error);
+		}
+	})
+  }
+})
 
 var server = http.createServer(function (request, response) {
-
-  response.writeHead(200, {'Content-Type': 'text/plain'});
   
   var url_parts = url.parse(request.url, true);
   var location = url_parts.query.where;
@@ -25,10 +36,17 @@ var server = http.createServer(function (request, response) {
   	return;
   }
   
-  if (request.url == '/upload' && request.method.toLowerCase() == 'post') {
-  	process_TPX_Data(request, response);
+  if (pathName == '/uploads' && request.method.toLowerCase() == 'post') {
+  	upload_TPX_Data(request, response);
   	return;
   }
+  
+  if (pathName.indexOf('/uploads') === 0) {
+    var file_id = pathName.substring(UPLOAD_DIR.length + 2);
+  	show_elevation_data(request, response, file_id);
+  	return;
+  }
+  
   
   display_form(request, response);
   
@@ -36,7 +54,6 @@ var server = http.createServer(function (request, response) {
 
 server.listen(PORT, HOST);
 
-console.log('Server running at http://' + HOST + ':' + PORT + '/');
 
 // ==============================================================================================
 
@@ -86,46 +103,58 @@ function handleSimpleElevationRequest(request, response, location) {
   });
 }
 
-function process_TPX_Data(req, res) {
+function upload_TPX_Data(req, res) {
+	
+	if (!fs.existsSync(UPLOAD_DIR)) {
+  		fs.mkdirSync(UPLOAD_DIR);
+	}
+	
+	
 	var form = new formidable.IncomingForm();
-
+	
+	form.uploadDir = UPLOAD_DIR;
     form.parse(req, function(err, fields, files) {
-        res.writeHead(200, {'content-type': 'text/plain'});
 	    sys.debug('received upload:\n\n' + util.inspect({fields: fields, files: files}));
-      	sys.debug("Reading " + tempFile);
-      	
       	var tempFile = files.gpsdata.path;
-      	var elevation = [];
-      
-    	var parser = new xml2js.Parser();
-		fs.readFile(tempFile, function(err, data) {
-			if (err) {
-				res.end('Error reading file: ' + err);
-				return;
-			}
-					
-		    parser.parseString(data, function (err, result) {
-		        console.dir(result);
-		        console.log('Done');
-		        var tcd = result.TrainingCenterDatabase;
-		       // res.write('\TCD: ' + util.inspect(tcd));
-		        for (var a = 0; a < tcd.Activities.length; a++) {
-		        	var activity = tcd.Activities[a].Activity[0];
-		        	res.write('\nActivity: ' + activity.Id + " --> " +  util.inspect(activity));
-		        	
-		        	for (var l = 0; l < activity.Lap.length; l++) {
-			        	var lap = activity.Lap[l];
-			        	res.write('\Lap: ' + util.inspect(lap));
-		       		 }
-		        	
-		        }
-		        
-		         res.end();
-		    });
-		});
-    
-	   
+      	var file_id = tempFile.substring(UPLOAD_DIR.length + 1);
+      	var file_url = 'http://' +req.headers.host + '/' + UPLOAD_DIR + '/'+file_id;
+      	
+      	sys.debug('Redirecting to ' + file_url);
+      	res.writeHead(301, {'Location': file_url} );
+		res.end();
     });
+}
+
+function show_elevation_data(req, res, file_id) {
+    sys.debug('Showing file ' + file_id);
+	var file_name = req
+
+	var parser = new xml2js.Parser();
+	fs.readFile(UPLOAD_DIR + '/' + file_id, function(err, data) {
+		if (err) {
+			show_error(req, res, 500, 'Error reading file: ' + err);
+			return;
+		}
+				
+	    parser.parseString(data, function (err, result) {
+	        console.dir(result);
+	        console.log('Done');
+	        var tcd = result.TrainingCenterDatabase;
+	       // res.write('\TCD: ' + util.inspect(tcd));
+	        for (var a = 0; a < tcd.Activities.length; a++) {
+	        	var activity = tcd.Activities[a].Activity[0];
+	        	res.write('\nActivity: ' + activity.Id + " --> " +  util.inspect(activity));
+	        	
+	        	for (var l = 0; l < activity.Lap.length; l++) {
+		        	var lap = activity.Lap[l];
+		        	res.write('\Lap: ' + util.inspect(lap));
+	       		 }
+	        	
+	        }
+	        
+	         res.end();
+	    });
+	});
 }
 
 
@@ -141,7 +170,7 @@ function display_form(req, res) {
     );
     res.write(
     	'<p>Upload a Garmen TrackPointExtension (.TPX) file to analyze elevation data.</p>'+
-        '<form action="/upload" method="post" enctype="multipart/form-data">'+
+        '<form action="/uploads" method="post" enctype="multipart/form-data">'+
         '<input type="file" name="gpsdata">'+
         '<input type="submit" value="Upload">'+
         '</form>'
