@@ -178,7 +178,7 @@ function display_form(req, res) {
         '</form>'
     );
     res.write(
-    	'<p>Upload a Garmen TrackPointExtension (.TPX) file to analyze elevation data.</p>'+
+    	'<p>Upload a Garmin Training Center (.TCX) file to analyze elevation data.</p>'+
         '<form action="/uploads" method="post" enctype="multipart/form-data">'+
         '<input type="file" name="gpsdata">'+
         '<input type="submit" value="Upload">'+
