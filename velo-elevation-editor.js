@@ -34,10 +34,11 @@ var server = http.createServer(function (request, response) {
   
 })
 
-sys.debug("Server: " + server);
 server.listen(PORT, HOST);
 
 console.log('Server running at http://' + HOST + ':' + PORT + '/');
+
+// ==============================================================================================
 
 function handleSimpleElevationRequest(request, response, location) {
   if (!location) {
