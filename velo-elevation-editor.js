@@ -132,12 +132,14 @@ function process_TPX_Data(req, res) {
 function display_form(req, res) {
     res.writeHead(200, {"Content-Type": "text/html"});
     res.write(
+        'Enter GPS coordinates to get Google''s elevation data.' +
         '<form action="/" method="get">'+
         '<input type="input" name="where" value="Latitude/Longitude">'+
         '<input type="submit" value="Get elevation">'+
         '</form>'
     );
     res.write(
+    	'<p>Upload a Garmen TrackPointExtension (.TPX) file to analyze elevation data.</p>'+
         '<form action="/upload" method="post" enctype="multipart/form-data">'+
         '<input type="file" name="gpsdata">'+
         '<input type="submit" value="Upload">'+
