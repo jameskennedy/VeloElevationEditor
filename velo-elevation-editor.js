@@ -131,6 +131,7 @@ function process_TPX_Data(req, res) {
 
 function display_form(req, res) {
     res.writeHead(200, {"Content-Type": "text/html"});
+    res.write('<h1>Velo Eelvation Editor</h1>');
     res.write(
         'Enter GPS coordinates to get Google\'s elevation data.' +
         '<form action="/" method="get">'+
