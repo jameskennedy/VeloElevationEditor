@@ -53,13 +53,13 @@ var server = http.createServer(function (request, response) {
   }
   
   if (path_name.indexOf('/uploads/') === 0) {
-    var file_id = path_name.substring(UPLOAD_DIR.length + 2);
-  	show_elevation_data(request, response, file_id);
-  	return;
+    //var file_id = path_name.substring(UPLOAD_DIR.length + 2);
+  	//show_elevation_data(request, response, file_id);
+	path_name = '/view_upload.html';
   }
   
-  if (!path_name || path_name == '' || path_name == '/') {
-	  path_name = '/index.html';
+  if (!path_name || path_name == '/') {
+	path_name = '/index.html';
   }
   
   serve_static_resource(request, response, path_name);
