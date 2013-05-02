@@ -184,14 +184,16 @@ function serve_static_resource(req, res, uri) {
     var filename = path.join(process.cwd(), CLIENT_PATH, uri);
     fs.exists(filename, function(exists) {
         if(!exists) {
-            show_error(req,res,404,"404 Not Found");
+        	sys.log("404 Not Found - " + filename);
+            show_error(req,res,404,"404 Not Found);
             return;
         }
         
-        sys.log("Serving file: " + filename);
         
         var extension = path.extname(filename).split(".")[1];
         var mimeType = mimeTypes[extension.toLowerCase()];
+
+        sys.log("Serving file: " + filename + ' with mime/type ' + mimeType);
         res.writeHead(200, mimeType);
 
         var fileStream = fs.createReadStream(filename);
@@ -202,6 +204,7 @@ function serve_static_resource(req, res, uri) {
 
 
 function show_error(request, response, errorCode, message) {
+	sys.log("Error: " + errorCode + ' - ' + message);
     response.writeHead(errorCode, {'Content-Type': 'text/html'});
     response.write('<title>Error ' + errorCode + '</title>');
     response.write('<p>' + message + '<\p>');
