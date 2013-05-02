@@ -25,16 +25,7 @@ var mimeTypes = {
     "css": "text/css",
     "tcx": "application/xml"};
 
-// Clean-up uploads dir
-fs.exists(UPLOAD_DIR, function (exists) {
-  if (exists) {
-	rimraf(UPLOAD_DIR, function(error) {
-		if (error) {
-			sys.error(error);
-		}
-	})
-  }
-})
+
 
 var server = http.createServer(function (request, response) {
   
@@ -43,12 +34,18 @@ var server = http.createServer(function (request, response) {
   var path_name = url_parts.pathname;
   
   if (location) {
-  	handleSimpleElevationRequest(request, response, location);
+  	handleJSONElevationRequest(request, response, location);
   	return;
   }
   
-  if (path_name == '/uploads' && request.method.toLowerCase() == 'post') {
-  	upload_TPX_Data(request, response);
+  if (path_name.indexOf('/data/') === 0) {
+ 	 var file_id = path_name.substring('/data/'.length);
+  	 handleJSONDataRequest(request, response, file_id);
+  	 return;
+  }
+  
+  if (path_name === '/uploads' && request.method.toLowerCase() == 'post') {
+  	upload_TCX_Data(request, response);
   	return;
   }
   
@@ -71,7 +68,7 @@ server.listen(PORT, HOST);
 
 // =============================================================================================
 
-function handleSimpleElevationRequest(request, response, location) {
+function handleJSONElevationRequest(request, response, location) {
   if (!location) {
     show_error(request, response, 400, '"where" parameter required. e.g. ' + request.headers.host + request.url + '?where=49.279832,-123.110632');
   	return;
@@ -101,8 +98,8 @@ function handleSimpleElevationRequest(request, response, location) {
       var responseObj = JSON.parse(response_data);
       var elevation = responseObj.results[0].elevation;
       
-      response.writeHead(200, {'Content-Type': 'text/plain'});
-      response.write(elevation + '', 'binary');
+      response.writeHead(200, {'Content-Type': 'text/javascript'});
+      response.write(elevation + '');
       response.end();
     });
     
@@ -117,7 +114,7 @@ function handleSimpleElevationRequest(request, response, location) {
   });
 }
 
-function upload_TPX_Data(req, res) {
+function upload_TCX_Data(req, res) {
 	
 	if (!fs.existsSync(UPLOAD_DIR)) {
   		fs.mkdirSync(UPLOAD_DIR);
@@ -139,12 +136,20 @@ function upload_TPX_Data(req, res) {
     });
 }
 
-function show_elevation_data(req, res, file_id) {
+function handleJSONDataRequest(req, res, file_id) {
     sys.debug('Showing file ' + file_id);
-	var file_name = req
+	var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
+	
+	if (!fs.existsSync(file_name)) {
+  		sys.log("404 Not Found - " + file_name);
+        show_error(req,res,404,"404 Not Found");
+        return;
+	}
+	
+	var returnData = { latitude:[], longitude:[], uploadElevation:[], googleElevation:[] };
 
 	var parser = new xml2js.Parser();
-	fs.readFile(UPLOAD_DIR + '/' + file_id, function(err, data) {
+	fs.readFile(file_name, function(err, data) {
 		if (err) {
 			show_error(req, res, 500, 'Error reading file: ' + err);
 			return;
@@ -158,24 +163,27 @@ function show_elevation_data(req, res, file_id) {
 	        }
 	        
 	        var activity = tcd.Activities[0].Activity[0];
-	        res.write('\nActivity: ' + activity.Id);
-	        var track_points = [];
+	        returnData.activityId = activity.Id;
+	       
 	        var count = 0;
         	for (var l = 0; l < activity.Lap.length; l++) {
 	        	var lap = activity.Lap[l];
 	        	var points = lap.Track[0].Trackpoint;
-	        	for (var tck = 0; tck < points.length; tck++) {
-	        		track_points[count++] = points[tck];
+	        	for (var tck = 0; tck < points.length; tck++) {	        		
+	        		// Some track points may not have position (e.g. GPS out of range). Ignore.
+	        		if (!points[tck].Position) {
+	        			continue;
+	        		}
+	        		
+	        		returnData.latitude[count] = parseFloat(points[tck].Position[0].LatitudeDegrees);
+	        		returnData.longitude[count] = parseFloat(points[tck].Position[0].LongitudeDegrees);
+	        		returnData.uploadElevation[count] = parseFloat(points[tck].AltitudeMeters);
+	        		count++;
 	        	}
        		}
        		
-       		for (var p = 0; p < track_points.length; p++) {
-       		    var distance = track_points[p].DistanceMeters;
-       		    var elevation = track_points[p].AltitudeMeters;
-       			res.write(distance + " > " + elevation + 'm\n');
-       		}
-	        
-       		res.end();
+       		res.writeHead(200, {'Content-Type': 'text/javascript'});
+       		res.end(JSON.stringify(returnData));
 	    });
 	});
 }
@@ -185,7 +193,7 @@ function serve_static_resource(req, res, uri) {
     fs.exists(filename, function(exists) {
         if(!exists) {
         	sys.log("404 Not Found - " + filename);
-            show_error(req,res,404,"404 Not Found);
+            show_error(req,res,404,"404 Not Found");
             return;
         }
         
@@ -200,6 +208,18 @@ function serve_static_resource(req, res, uri) {
         fileStream.pipe(res);
         return fileStream;
     });
+}
+
+function deleteUploadDir() {
+	fs.exists(UPLOAD_DIR, function (exists) {
+	  if (exists) {
+		rimraf(UPLOAD_DIR, function(error) {
+			if (error) {
+				sys.error(error);
+			}
+		})
+	  }
+	})
 }
 
 
