@@ -18,9 +18,13 @@ function loadData() {
 function updateElevationChart() {
 		var data = document.data;
 		
-		var chartData = [['Distance', 'Uploaded Elevation']];
+		var chartData = [['Distance', 'Uploaded Elevation', 'Google Elevation']];
 		for (var i = 0; i < data.uploadElevation.length; i++) {
-			chartData[i + 1] = [data.distance[i], data.uploadElevation[i]];
+		    var googleElevation = data.googleElevation[i];
+		    if (!googleElevation) {
+		    	googleElevation = 0;
+		    }
+			chartData[i + 1] = [data.distance[i], data.uploadElevation[i], googleElevation];
 		}
 		
         var dataTable = google.visualization.arrayToDataTable(chartData);

@@ -4,17 +4,18 @@
 <body>
 <h1>Velo Eelevation Editor</h1>
 
-Enter GPS coordinates to get Google's elevation data.
-
-<form action="/" method="get">
-	<input type="input" name="where" value="Latitude/Longitude">
-	<input type="submit" value="Get elevation">
-</form>
-
 <p>Upload a Garmin Training Center (.TCX) file to analyze elevation data.</p>
+
 <form action="/uploads" method="post" enctype="multipart/form-data">
 	<input type="file" name="gpsdata">
 	<input type="submit" value="Upload">
+</form>
+
+<p>Enter GPS coordinates to get elevation from Google.</p>
+
+<form action="/" method="get">
+	<input type="text" name="where" value="49.000,-125.00">
+	<input type="submit" value="Get elevation">
 </form>
 
 <p>Here is a <a href="resources/sample_activity_300717555.tcx">sample TCX file</a> you can upload.</p>

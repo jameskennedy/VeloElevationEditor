@@ -13,6 +13,7 @@ var PORT = 8080;
 
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
+var MAX_REQUEST_LOCATIONS = 50;
 var UPLOAD_DIR = 'uploads';
 var CLIENT_PATH = 'client';
 
@@ -174,7 +175,6 @@ function handleJSONDataRequest(req, res, file_id) {
 	        		if (!points[tck].Position) {
 	        			continue;
 	        		}
-	        		sys.log(points[tck].Time + " " + util.inspect(points[tck].DistanceMeters));
 	        		returnData.latitude[count] = parseFloat(points[tck].Position[0].LatitudeDegrees);
 	        		returnData.longitude[count] = parseFloat(points[tck].Position[0].LongitudeDegrees);
 	        		returnData.uploadElevation[count] = parseFloat(points[tck].AltitudeMeters);
@@ -183,11 +183,71 @@ function handleJSONDataRequest(req, res, file_id) {
 	        	}
        		}
        		
-       		res.writeHead(200, {'Content-Type': 'text/javascript'});
-       		res.end(JSON.stringify(returnData));
-	    });
-	});
+       		getGoogleElevations(req, res, returnData, function() {
+       			res.writeHead(200, {'Content-Type': 'text/javascript'});
+       			res.end(JSON.stringify(returnData));
+       		})    		
+	    })
+	})
 }
+
+function getGoogleElevations(request, response, resultData, callback) {
+  var index = 0;
+
+  // TODO: More efficient append
+  var locations = "";
+  var maxLocations = Math.min(MAX_REQUEST_LOCATIONS, resultData.latitude.length);
+  for (var i = 0; i < maxLocations; i++) {
+  	locations += resultData.latitude[i] + ',' + resultData.longitude[i];
+  	if (i < maxLocations -1) {
+  		locations += '|';
+  	}
+  }
+  
+  sys.log(locations);
+   
+  var google = http.createClient(80, GOOGLE_HOST);
+  var google_request = google.request('GET', GOOGLE_PATH + '?locations=' + locations + '&sensor=true');
+  var response_data = '';
+  
+  google_request.addListener('response', function (google_response) {
+    google_response.addListener('data', function(chunk) {
+   	 response_data += chunk;
+    });
+    
+    google_response.addListener('end', function() {
+      if (200 != google_response.statusCode) {
+      	var message = '<p>An unkown error occured.</p>';
+      	
+    	if (google_response.statusCode == 400) {
+    		message = '<p>Input parameters are invalid.</p>';
+    	}
+    	
+  		show_error(request, response, google_response.statusCode, message);
+  		return;
+      }
+    
+      var responseObj = JSON.parse(response_data);
+ 
+      
+      for (var i = 0; i < responseObj.results.length; i++) {
+        sys.log(responseObj.results[i].elevation);
+      	resultData.googleElevation[i] = parseFloat(responseObj.results[i].elevation);
+      }
+      
+      callback();
+    });
+  });
+  
+  request.addListener('data', function(chunk) {
+  });
+  
+  request.addListener('end', function() {
+    google_request.end();
+  });
+}
+
+
 
 function serve_static_resource(req, res, uri) {
     var filename = path.join(process.cwd(), CLIENT_PATH, uri);
