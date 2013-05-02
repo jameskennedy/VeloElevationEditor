@@ -175,7 +175,7 @@ function show_elevation_data(req, res, file_id) {
        			res.write(distance + " > " + elevation + 'm\n');
        		}
 	        
-       		serve_static_resource(request, response, RESOURCE_PATH + '/' + 'view_upload.html');
+       		res.end();
 	    });
 	});
 }
