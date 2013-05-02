@@ -146,7 +146,7 @@ function handleJSONDataRequest(req, res, file_id) {
         return;
 	}
 	
-	var returnData = { latitude:[], longitude:[], uploadElevation:[], googleElevation:[] };
+	var returnData = { latitude:[], longitude:[], uploadElevation:[], googleElevation:[], distance:[] };
 
 	var parser = new xml2js.Parser();
 	fs.readFile(file_name, function(err, data) {
@@ -174,10 +174,11 @@ function handleJSONDataRequest(req, res, file_id) {
 	        		if (!points[tck].Position) {
 	        			continue;
 	        		}
-	        		
+	        		sys.log(points[tck].Time + " " + util.inspect(points[tck].DistanceMeters));
 	        		returnData.latitude[count] = parseFloat(points[tck].Position[0].LatitudeDegrees);
 	        		returnData.longitude[count] = parseFloat(points[tck].Position[0].LongitudeDegrees);
 	        		returnData.uploadElevation[count] = parseFloat(points[tck].AltitudeMeters);
+	        		returnData.distance[count] = parseFloat(points[tck].DistanceMeters) / 1000;
 	        		count++;
 	        	}
        		}

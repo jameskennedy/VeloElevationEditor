@@ -6,13 +6,34 @@ function loadData() {
 	var jqxhr = $.getJSON( '/data/' + file_id, function(data) {
 		document.data = data;
 		updateMaps();
+		updateElevationChart();
+		document.getElementById('loading');
+		loading.style.display = 'none';
 	})
 	.done(function() { console.log( "loadData() completed successfully" ); })
 	.fail(function(error) { console.log( "loadData() failed: " + error); })
 	.always(function() { console.log( "Finished loadData()" ); });
 }
 
+function updateElevationChart() {
+		var data = document.data;
+		
+		var chartData = [['Distance', 'Uploaded Elevation']];
+		for (var i = 0; i < data.uploadElevation.length; i++) {
+			chartData[i + 1] = [data.distance[i], data.uploadElevation[i]];
+		}
+		
+        var dataTable = google.visualization.arrayToDataTable(chartData);
 
+        var options = {
+          title : 'Elevation',
+          hAxis: { title: 'Distance (km)'},
+          vAxis: { title: 'Elevation (m)'}
+        }
+
+        var chart = new google.visualization.LineChart(document.getElementById('elevation-canvas'));
+        chart.draw(dataTable, options);
+}
 
 function updateMaps() {
 	var data = document.data;

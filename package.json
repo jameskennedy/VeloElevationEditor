@@ -1,6 +1,6 @@
 {
   "name": "VeloElevationEditor",
-  "version": "0.1.0-4",
+  "version": "0.1.0-5",
   "description": "An editor for adjusting route elevation data.",
   "main": "velo-elevation-editor.js",
   "scripts": {
