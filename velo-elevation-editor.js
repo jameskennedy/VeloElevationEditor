@@ -14,6 +14,7 @@ var PORT = 8080;
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
 var UPLOAD_DIR = 'uploads';
+var CLIENT_PATH = 'client';
 
 var mimeTypes = {
     "html": "text/html",
@@ -39,31 +40,29 @@ var server = http.createServer(function (request, response) {
   
   var url_parts = url.parse(request.url, true);
   var location = url_parts.query.where;
-  var pathName = url_parts.pathname;
+  var path_name = url_parts.pathname;
   
   if (location) {
   	handleSimpleElevationRequest(request, response, location);
   	return;
   }
   
-  if (pathName == '/uploads' && request.method.toLowerCase() == 'post') {
+  if (path_name == '/uploads' && request.method.toLowerCase() == 'post') {
   	upload_TPX_Data(request, response);
   	return;
   }
   
-  if (pathName.indexOf('/uploads/') === 0) {
-    var file_id = pathName.substring(UPLOAD_DIR.length + 2);
+  if (path_name.indexOf('/uploads/') === 0) {
+    var file_id = path_name.substring(UPLOAD_DIR.length + 2);
   	show_elevation_data(request, response, file_id);
   	return;
   }
   
-  if (pathName.indexOf('/resources/') === 0) {
-  	serve_static_resource(request, response);
-  	return;
+  if (!path_name || path_name == '' || path_name == '/') {
+	  path_name = '/index.html';
   }
   
-  
-  display_form(request, response);
+  serve_static_resource(request, response, path_name);
   
 })
 
@@ -176,47 +175,28 @@ function show_elevation_data(req, res, file_id) {
        			res.write(distance + " > " + elevation + 'm\n');
        		}
 	        
-	        res.end();
+       		serve_static_resource(request, response, RESOURCE_PATH + '/' + 'view_upload.html');
 	    });
 	});
 }
 
-
-function display_form(req, res) {
-    res.writeHead(200, {"Content-Type": "text/html"});
-    res.write('<h1>Velo Eelevation Editor</h1>');
-    res.write(
-        'Enter GPS coordinates to get Google\'s elevation data.' +
-        '<form action="/" method="get">'+
-        '<input type="input" name="where" value="Latitude/Longitude">'+
-        '<input type="submit" value="Get elevation">'+
-        '</form>'
-    );
-    res.write(
-    	'<p>Upload a Garmin Training Center (.TCX) file to analyze elevation data.</p>'+
-        '<form action="/uploads" method="post" enctype="multipart/form-data">'+
-        '<input type="file" name="gpsdata">'+
-        '<input type="submit" value="Upload">'+
-        '</form>'
-    );
-    res.write('<p>Here is a <a href="resources/sample_activity_300717555.tcx">sample TCX file</a> you can upload.</p>');
-    res.end();
-}
-
-function serve_static_resource(req, res) {
-	var uri = url.parse(req.url).pathname;
-    var filename = path.join(process.cwd(), uri);
+function serve_static_resource(req, res, uri) {
+    var filename = path.join(process.cwd(), CLIENT_PATH, uri);
     fs.exists(filename, function(exists) {
         if(!exists) {
             show_error(req,res,404,"404 Not Found");
             return;
         }
         
-        var mimeType = mimeTypes[path.extname(filename).split(".")[1].toLowerCase()];
+        sys.log("Serving file: " + filename);
+        
+        var extension = path.extname(filename).split(".")[1];
+        var mimeType = mimeTypes[extension.toLowerCase()];
         res.writeHead(200, mimeType);
 
         var fileStream = fs.createReadStream(filename);
         fileStream.pipe(res);
+        return fileStream;
     });
 }
 
