@@ -51,11 +51,10 @@ function updateMaps() {
 		console.error("Data is corrupt, cannot load map.");
 		return;
 	}
-
-    var middle = data.latitude.length / 2;
+    var middle = Math.round(data.latitude.length / 2);
   	var myLatLng = new google.maps.LatLng(data.latitude[middle], data.longitude[middle]);
   	var mapOptions = {
-    	zoom: 10,
+    	zoom: 11,
     	center: myLatLng,
     	mapTypeId: google.maps.MapTypeId.TERRAIN
  	 };

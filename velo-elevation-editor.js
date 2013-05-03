@@ -14,7 +14,7 @@ var PORT = 8080;
 
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
-var MAX_REQUEST_LOCATIONS = 512; // Google enforced limit
+var MAX_REQUEST_LOCATIONS = 500; // Google enforced limit
 var UPLOAD_DIR = 'uploads';
 var CLIENT_PATH = 'client';
 
@@ -74,7 +74,6 @@ server.listen(PORT, HOST);
 
 // =============================================================================================
 
-
 // Write upload to disk and redirect to /uploads/[file_id]
 function upload_TCX_Data(req, res) {
 	
@@ -101,38 +100,40 @@ function upload_TCX_Data(req, res) {
 // Fetch all relevant data including latitude, longitude, uploaded elevation, 
 // and google elevation for the given file_id as a JSON object.
 function handleJSONDataRequest(req, res, file_id) {
-    sys.debug('Showing file ' + file_id);
+    // Lookup the file
 	var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
-	
 	if (!fs.existsSync(file_name)) {
   		sys.log("404 Not Found - " + file_name);
-        show_error(req,res,404,"404 Not Found");
+        show_error(res,404,"404 Not Found");
         return;
 	}
 	
-	var returnData = { latitude:[], longitude:[], uploadElevation:[], googleElevation:[], distance:[] };
+	// Initialize return data-structure
+	var returnData = { file_id:file_id, latitude:[], longitude:[], uploadElevation:[], googleElevation:[], distance:[] };
 
+    // Start parsing the TCX XML
 	var parser = new xml2js.Parser();
 	fs.readFile(file_name, function(err, data) {
 		if (err) {
-			show_error(req, res, 500, 'Error reading file: ' + err);
+			show_error(res, 500, 'Error reading file: ' + err);
 			return;
 		}
 				
 	    parser.parseString(data, function (err, result) {
 	        var tcd = result.TrainingCenterDatabase;
 	        if (!tcd || tcd.Activities.length != 1) {
-	          show_error(req, res, 400, "Uploaded file must contain one and only one activity.");
+	          show_error(res, 400, "Uploaded file must contain one and only one activity.");
 	          return;
 	        }
 	        
+	        // Extract data for a single activity
 	        var activity = tcd.Activities[0].Activity[0];
 	        returnData.activityId = activity.Id;
-	       
 	        var count = 0;
         	for (var l = 0; l < activity.Lap.length; l++) {
 	        	var lap = activity.Lap[l];
 	        	var points = lap.Track[0].Trackpoint;
+	        	// sys.debug("Lap " + l + " Points: " + points.length);
 	        	for (var tck = 0; tck < points.length; tck++) {	        		
 	        		// Some track points may not have position (e.g. GPS out of range). Ignore.
 	        		if (!points[tck].Position) {
@@ -142,29 +143,40 @@ function handleJSONDataRequest(req, res, file_id) {
 	        		returnData.longitude[count] = parseFloat(points[tck].Position[0].LongitudeDegrees);
 	        		returnData.uploadElevation[count] = parseFloat(points[tck].AltitudeMeters);
 	        		returnData.distance[count] = parseFloat(points[tck].DistanceMeters) / 1000;
+	        		
+                    // sys.debug("Lap " + l + " Point: " + tck + ' ' + util.inspect(returnData.latitude[count] + ', ' + returnData.longitude[count]));
 	        		count++;
 	        	}
        		}
        		
-       		getGoogleElevations(req, res, returnData, function() {
-       			res.writeHead(200, {'Content-Type': 'text/javascript'});
-       			res.end(JSON.stringify(returnData));
-       		})    		
+       		var nextUnfetchedIndex = 0;
+       		var GoogleCallback = function(lastIndexProcessed, returnData) {
+               if (lastIndexProcessed >= returnData.latitude.length - 1) {
+                    res.writeHead(200, {'Content-Type': 'text/javascript'});
+                    res.end(JSON.stringify(returnData));
+                    return;
+                }
+                
+                nextUnfetchedIndex = Math.min(lastIndexProcessed + 1, returnData.latitude.length);
+                getGoogleElevations(res, returnData, nextUnfetchedIndex, GoogleCallback);
+            }
+            
+       		getGoogleElevations(res, returnData, nextUnfetchedIndex, GoogleCallback);  		
 	    })
 	})
 }
 
-function getGoogleElevations(request, response, resultData, callback) {
-  var index = 0;
+function getGoogleElevations(response, resultData, nextUnfetchedIndex, callback) {
+  var maxIndex = Math.min(nextUnfetchedIndex + MAX_REQUEST_LOCATIONS, resultData.latitude.length);
   
-  var maxLocations = Math.min(MAX_REQUEST_LOCATIONS, resultData.latitude.length);
+  sys.debug('Upload ' + resultData.file_id + ': Fetching Google data for points ' + nextUnfetchedIndex + ' to ' + maxIndex);
   
   var points = []; 
-  for (var i = 0; i < maxLocations; i++) {
-  	points[i] = new PolylineEncoder.latLng(resultData.latitude[i], resultData.longitude[i]);
+  for (var i = nextUnfetchedIndex; i < maxIndex; i++) {
+  	points.push(new PolylineEncoder.latLng(resultData.latitude[i], resultData.longitude[i]));
   }
   
-  polylineEncoder = new PolylineEncoder(1,3000,0.000000001);
+  polylineEncoder = new PolylineEncoder(18,2,0.000000000001);
   polyline = polylineEncoder.dpEncodeToJSON(points);
 
   var google = http.createClient(80, GOOGLE_HOST);
@@ -173,7 +185,7 @@ function getGoogleElevations(request, response, resultData, callback) {
   
   google_request.addListener('response', function (google_response) {
     google_response.addListener('data', function(chunk) {
-   	 response_data += chunk;
+   	    response_data += chunk;
     });
     
     google_response.addListener('end', function() {
@@ -184,38 +196,42 @@ function getGoogleElevations(request, response, resultData, callback) {
     		message = '<p>Input parameters are invalid.</p>';
     	}
     	
-  		show_error(request, response, google_response.statusCode, message);
+    	sys.error("Google response error: " + google_response.statusCode);
+  		show_error(response, google_response.statusCode, message);
   		return;
       }
     
       var responseObj = JSON.parse(response_data);
- 
+      var googlePointCount = responseObj.results.length;
       
-      for (var i = 0; i < responseObj.results.length; i++) {
-        sys.log(responseObj.results[i].elevation);
-      	resultData.googleElevation[i] = parseFloat(responseObj.results[i].elevation);
+      sys.debug("Got a 200 OK response from google with " +  googlePointCount + ' points.');
+ 
+     if (googlePointCount != points.length) {
+        sys.error('ERROR: Unexpected state: Sent ' + points.length + ' points to Google but got back ' + googlePointCount);
+        //show_error(response, 501, "My apologies, server error.");
+        //return;
       }
       
-      callback();
+      for (var i = 0; i < googlePointCount; i++) {
+        var index = nextUnfetchedIndex + i;
+      	resultData.googleElevation[index] = parseFloat(responseObj.results[i].elevation);
+      	maxIndex = index;
+      }
+      
+      callback(maxIndex, resultData);
     });
   });
   
-  request.addListener('data', function(chunk) {
-  });
+  google_request.end(); 
   
-  request.addListener('end', function() {
-    google_request.end();
-  });
 }
-
-
 
 function serve_static_resource(req, res, uri) {
     var filename = path.join(process.cwd(), CLIENT_PATH, uri);
     fs.exists(filename, function(exists) {
         if(!exists) {
         	sys.log("404 Not Found - " + filename);
-            show_error(req,res,404,"404 Not Found");
+            show_error(res,404,"404 Not Found");
             return;
         }
         
@@ -292,7 +308,7 @@ function deleteUploadDir() {
 }
 
 
-function show_error(request, response, errorCode, message) {
+function show_error(response, errorCode, message) {
 	sys.log("Error: " + errorCode + ' - ' + message);
     response.writeHead(errorCode, {'Content-Type': 'text/html'});
     response.write('<title>Error ' + errorCode + '</title>');
