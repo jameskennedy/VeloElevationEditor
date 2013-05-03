@@ -108,6 +108,29 @@ function handleJSONDataRequest(req, res, file_id) {
         return;
 	}
 	
+	loadParsedData(file_id, function(err, dataString) {
+	   if (!err) {
+	        // Used cached parsed/Google data
+	        var data = JSON.parse(dataString);
+	        calculateAdjustment(data, 0, data.latitude.length - 1);
+            res.writeHead(200, {'Content-Type': 'text/javascript'});
+            res.end(JSON.stringify(data));
+	   } else {
+	       if (err.code != 'ENOENT') {
+	         sys.error(util.inspect(err));
+	         show_error(res, 501, 'Internal error attempting to read parsed upload.');
+	         return;
+	       }
+	       
+	       // File not yet parsed, do it now
+	       parseUpload(req,res,file_id);
+	   }
+	})
+}
+
+function parseUpload(req, res, file_id) {	
+    var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
+
 	// Initialize return data-structure
 	var returnData = { file_id:file_id, latitude:[], longitude:[], uploadElevation:[], googleElevation:[], distance:[] };
 
@@ -152,6 +175,7 @@ function handleJSONDataRequest(req, res, file_id) {
        		var nextUnfetchedIndex = 0;
        		var GoogleCallback = function(lastIndexProcessed, returnData) {
                if (lastIndexProcessed >= returnData.latitude.length - 1) {
+                    savedParsedData(file_id, returnData);
                     calculateAdjustment(returnData, 0, returnData.latitude.length - 1);
                     res.writeHead(200, {'Content-Type': 'text/javascript'});
                     res.end(JSON.stringify(returnData));
@@ -318,6 +342,26 @@ function handleJSONElevationRequest(request, response, location) {
   request.addListener('end', function() {
     google_request.end();
   });
+}
+
+function savedParsedData(file_id, data) {
+    var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id + "_parsed");
+    if (fs.existsSync(file_name)) {
+        fs.truncateSync(file_name, 0);
+    }
+    
+    fs.writeFile(file_name, JSON.stringify(data), function(err) {
+	    if (err) {
+	        sys.error('Failed to cache parsed data for upload ' + file_id + '. ' +err);
+	    } else {
+	        sys.error('Cached parsed data for file ' + file_id);
+	    }
+    }); 
+}
+
+function loadParsedData(file_id, callback) {
+      var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id + "_parsed");
+      fs.readFile(file_name, 'utf8', callback);
 }
 
 function deleteUploadDir() {
