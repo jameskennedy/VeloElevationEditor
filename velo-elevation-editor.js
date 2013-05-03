@@ -14,7 +14,7 @@ var PORT = 8080;
 
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
-var MAX_REQUEST_LOCATIONS = 500; // Google enforced limit
+var MAX_REQUEST_LOCATIONS = 512; // Google enforced limit
 var UPLOAD_DIR = 'uploads';
 var CLIENT_PATH = 'client';
 
@@ -152,6 +152,7 @@ function handleJSONDataRequest(req, res, file_id) {
        		var nextUnfetchedIndex = 0;
        		var GoogleCallback = function(lastIndexProcessed, returnData) {
                if (lastIndexProcessed >= returnData.latitude.length - 1) {
+                    calculateAdjustment(returnData, 0, returnData.latitude.length - 1);
                     res.writeHead(200, {'Content-Type': 'text/javascript'});
                     res.end(JSON.stringify(returnData));
                     return;
@@ -224,6 +225,30 @@ function getGoogleElevations(response, resultData, nextUnfetchedIndex, callback)
   
   google_request.end(); 
   
+}
+
+function calculateAdjustment(data, start, end) {
+    var index = start;
+    var uploadElevationStart = data.uploadElevation[start];
+    var uploadElevationStop = data.uploadElevation[end];
+    var googleStart = data.googleElevation[start];
+    var googleStop = data.googleElevation[end];
+    
+    var fixedAdjustment = (googleStart - uploadElevationStart + googleStop - uploadElevationStop) / 2;
+    
+    if (!data.adjustedElevation) {
+        data.adjustedElevation = [];
+        for (var i = 0; i < start; i++) {
+            data.adjustedElevation[i] = data.uploadElevation[i];
+        }
+        for (var i = end + 1; i < data.uploadElevation.length; i++) {
+            data.adjustedElevation[i] = data.uploadElevation[i];
+        }
+    }
+    
+    for (var i = start; i <= end; i++) {
+        data.adjustedElevation[i] = data.uploadElevation[i] + fixedAdjustment;
+    } 
 }
 
 function serve_static_resource(req, res, uri) {

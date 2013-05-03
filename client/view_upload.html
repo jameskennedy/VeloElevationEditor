@@ -20,12 +20,28 @@
 <body>
 
 <h1>Velo Elevation Editor</h1>
+<p><a href="/">Upload page</a></p>
 
 <div id="loading">Please wait...</div>
 <div id="map-canvas"></div>
 <div id="elevation-canvas" style="width: 60%; height: 400px;"></div>
 
 
+<table>
+    <tr>
+        <td><input type="radio" name="adjustmentMethod" value="EndPointShift" checked="true"/></td>
+        <td>End-Point Shift: Keep the same elevation profile that was uploaded but shift it to match start and end points with the Google elevation.</td>
+    </tr>
+    <tr>
+        <td><input type="radio" name="adjustmentMethod" value="UseGoogle"/></td>
+        <td>Use Google: Replace the uploaded elevation with Google's</td>
+    </tr>    
+</table>
+
+
+<form action="/export/" METHOD="GET">
+    <input type="button" value="Export Adjusted TCX" disabled="true" />
+</form>
 
 </body>
 
