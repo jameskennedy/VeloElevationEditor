@@ -7,13 +7,14 @@ var util = require('util');
 var fs = require('fs');
 var xml2js = require("xml2js");
 var rimraf = require("rimraf");
+var polyLine = require("./PolylineEncoder");
 
 var HOST = 'localhost';
 var PORT = 8080;
 
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
-var MAX_REQUEST_LOCATIONS = 50;
+var MAX_REQUEST_LOCATIONS = 512;
 var UPLOAD_DIR = 'uploads';
 var CLIENT_PATH = 'client';
 
@@ -193,21 +194,19 @@ function handleJSONDataRequest(req, res, file_id) {
 
 function getGoogleElevations(request, response, resultData, callback) {
   var index = 0;
-
-  // TODO: More efficient append
-  var locations = "";
+  
   var maxLocations = Math.min(MAX_REQUEST_LOCATIONS, resultData.latitude.length);
+  
+  var points = []; 
   for (var i = 0; i < maxLocations; i++) {
-  	locations += resultData.latitude[i] + ',' + resultData.longitude[i];
-  	if (i < maxLocations -1) {
-  		locations += '|';
-  	}
+  	points[i] = new PolylineEncoder.latLng(resultData.latitude[i], resultData.longitude[i]);
   }
   
-  sys.log(locations);
-   
+  polylineEncoder = new PolylineEncoder(1,3000,0.000000001);
+  polyline = polylineEncoder.dpEncodeToJSON(points);
+
   var google = http.createClient(80, GOOGLE_HOST);
-  var google_request = google.request('GET', GOOGLE_PATH + '?locations=' + locations + '&sensor=true');
+  var google_request = google.request('GET', GOOGLE_PATH + '?locations=enc:' + polyline.points + '&sensor=true');
   var response_data = '';
   
   google_request.addListener('response', function (google_response) {
