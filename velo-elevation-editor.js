@@ -34,13 +34,7 @@ var mimeTypes = {
 var server = http.createServer(function (request, response) {
   
   var url_parts = url.parse(request.url, true);
-  var location = url_parts.query.where;
   var path_name = url_parts.pathname;
-  
-  if (location) {
-  	handleJSONElevationRequest(request, response, location);
-  	return;
-  }
   
   // API request of JSON data for file_id
   if (path_name.indexOf('/data/') === 0) {
@@ -295,53 +289,6 @@ function serve_static_resource(req, res, uri) {
         fileStream.pipe(res);
         return fileStream;
     });
-}
-
-//Single coordinate elevation request uses Google API
-function handleJSONElevationRequest(request, response, location) {
-  if (!location) {
-    show_error(request, response, 400, '"where" parameter required. e.g. ' + request.headers.host + request.url + '?where=49.279832,-123.110632');
-  	return;
-  }
-  
-  var google = http.createClient(80, GOOGLE_HOST);
-  var google_request = google.request('GET', GOOGLE_PATH + '?locations=' + location + '&sensor=true');
-  var response_data = '';
-  
-  google_request.addListener('response', function (google_response) {
-    google_response.addListener('data', function(chunk) {
-   	 response_data += chunk;
-    });
-    
-    google_response.addListener('end', function() {
-      if (200 != google_response.statusCode) {
-      	var message = '<p>An unkown error occured.</p>';
-      	
-    	if (google_response.statusCode == 400) {
-    		message = '<p>Input parameters are invalid.</p>';
-    	}
-    	
-  		show_error(request, response, google_response.statusCode, message);
-  		return;
-      }
-    
-      var responseObj = JSON.parse(response_data);
-      var elevation = responseObj.results[0].elevation;
-      
-      response.writeHead(200, {'Content-Type': 'text/javascript'});
-      response.write(elevation + '');
-      response.end();
-    });
-    
-    response.writeHead(google_response.statusCode, google_response.headers);
-  });
-  
-  request.addListener('data', function(chunk) {
-  });
-  
-  request.addListener('end', function() {
-    google_request.end();
-  });
 }
 
 function savedParsedData(file_id, data) {
