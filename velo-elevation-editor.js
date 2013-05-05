@@ -8,9 +8,10 @@ var fs = require('fs');
 var xml2js = require("xml2js");
 var rimraf = require("rimraf");
 var polyLine = require("./PolylineEncoder");
+var lazy = require("lazy");
 
 var HOST = 'localhost';
-var PORT = 8080;
+var PORT = 8081;
 
 var GOOGLE_HOST = 'maps.googleapis.com';
 var GOOGLE_PATH = '/maps/api/elevation/json';
@@ -54,6 +55,14 @@ var server = http.createServer(function (request, response) {
 	path_name = '/view_upload.html';
   }
   
+  // File export
+  if (path_name.indexOf('/export/') === 0) {
+	  var file_id = url_parts.query.file_id;
+	  sys.debug("Exporting file " + file_id);
+	  export_adjusted_TCX(response, file_id);
+	  return;
+  }
+  
   // Default page
   if (!path_name || path_name == '/') {
 	path_name = '/index.html';
@@ -75,14 +84,18 @@ function upload_TCX_Data(req, res) {
   		fs.mkdirSync(UPLOAD_DIR);
 	}
 	
-	
 	var form = new formidable.IncomingForm();
 	
 	form.uploadDir = UPLOAD_DIR;
+	form.keepExtensions = false;
     form.parse(req, function(err, fields, files) {
-	    sys.debug('received upload:\n\n' + util.inspect({fields: fields, files: files}));
       	var tempFile = files.gpsdata.path;
       	var file_id = tempFile.substring(UPLOAD_DIR.length + 1);
+
+	    sys.debug('received upload of file: ' + file_id + ' ' + files.gpsdata.name);
+      	
+      	store_meta_data(file_id, files.gpsdata);
+      	
       	var file_url = 'http://' +req.headers.host + '/' + UPLOAD_DIR + '/'+file_id;
       	
       	sys.debug('Redirecting to ' + file_url);
@@ -91,14 +104,43 @@ function upload_TCX_Data(req, res) {
     });
 }
 
+function store_meta_data(file_id, file_info) {
+	var meta_file_name = path.join(process.cwd(), UPLOAD_DIR, file_id + "_meta");
+    fs.writeFile(meta_file_name, JSON.stringify(file_info), function(err) {
+	    if (err) {
+	        sys.error('Failed to store metadata for upload ' + file_id + '. ' +err);
+	    } else {
+	        sys.debug('Stored metadata for file ' + file_id);
+	    }
+    }); 
+}
+
+function load_meta_data(file_id) {
+	var meta_file_name = path.join(process.cwd(), UPLOAD_DIR, file_id + "_meta");
+	return JSON.parse(fs.readFileSync(meta_file_name, 'utf8'));
+}
+
 // Fetch all relevant data including latitude, longitude, uploaded elevation, 
 // and google elevation for the given file_id as a JSON object.
 function handleJSONDataRequest(req, res, file_id) {
-    // Lookup the file
+	loadOrParseData(res, file_id, function(err, data) {
+		if (err) {
+	        sys.error(util.inspect(err));
+			show_error(res, 501, 'Internal error attempting to read parsed upload.');
+			return;
+		}
+		
+		calculateAdjustment(data, 0, data.latitude.length - 1);
+        res.writeHead(200, {'Content-Type': 'text/javascript'});
+        res.end(JSON.stringify(data));
+    })
+}
+
+function loadOrParseData(response, file_id, callback) {
+	// Verify file was uploaded
 	var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
 	if (!fs.existsSync(file_name)) {
-  		sys.log("404 Not Found - " + file_name);
-        show_error(res,404,"404 Not Found");
+  		callback('404 - Not an upload: ' + file_id);
         return;
 	}
 	
@@ -106,28 +148,32 @@ function handleJSONDataRequest(req, res, file_id) {
 	   if (!err) {
 	        // Used cached parsed/Google data
 	        var data = JSON.parse(dataString);
-	        calculateAdjustment(data, 0, data.latitude.length - 1);
-            res.writeHead(200, {'Content-Type': 'text/javascript'});
-            res.end(JSON.stringify(data));
+	        callback(null, data);
 	   } else {
 	       if (err.code != 'ENOENT') {
 	         sys.error(util.inspect(err));
-	         show_error(res, 501, 'Internal error attempting to read parsed upload.');
+	         callback(err);
 	         return;
 	       }
 	       
 	       // File not yet parsed, do it now
-	       parseUpload(req,res,file_id);
+	       parseUpload(response, file_id, function(returnData) {
+	    	   callback(null, returnData);
+	       });
 	   }
 	})
 }
 
-function parseUpload(req, res, file_id) {	
+function parseUpload(res, file_id, parse_callback) {	
     var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
 
 	// Initialize return data-structure
 	var returnData = { file_id:file_id, latitude:[], longitude:[], uploadElevation:[], googleElevation:[], distance:[] };
 
+	// Include upload meta-data
+	var metadata = load_meta_data(file_id);
+	returnData.file_name = metadata.name;
+	
     // Start parsing the TCX XML
 	var parser = new xml2js.Parser();
 	fs.readFile(file_name, function(err, data) {
@@ -170,9 +216,7 @@ function parseUpload(req, res, file_id) {
        		var GoogleCallback = function(lastIndexProcessed, returnData) {
                if (lastIndexProcessed >= returnData.latitude.length - 1) {
                     savedParsedData(file_id, returnData);
-                    calculateAdjustment(returnData, 0, returnData.latitude.length - 1);
-                    res.writeHead(200, {'Content-Type': 'text/javascript'});
-                    res.end(JSON.stringify(returnData));
+                    parse_callback(returnData);
                     return;
                 }
                 
@@ -269,6 +313,81 @@ function calculateAdjustment(data, start, end) {
     } 
 }
 
+/*
+ * Return the original TCX file content but with elevations replaced with
+ * adjusted values.
+ */
+function export_adjusted_TCX(response, file_id) {
+	var latElStart = '<LatitudeDegrees>';
+	var latElEnd = '</LatitudeDegrees>';
+	var longElStart = '<LongitudeDegrees>';
+	var longElEnd = '</LongitudeDegrees>';
+	var altStart = '<AltitudeMeters>';
+	var altEnd = '</AltitudeMeters>';
+	
+	loadOrParseData(response, file_id, function(err, data) {
+		if (err) {
+	        sys.error(util.inspect(err));
+			show_error(res, 501, 'Internal error attempting to read parsed upload.');
+			return;
+		}
+		
+		calculateAdjustment(data, 0, data.latitude.length - 1);
+		
+		var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
+
+		var tpIndex = 0;
+		var lastLat = null;
+		var lastLong = null;
+		var replacementCount = 0;
+		
+		var wroteHeader = false;
+		new lazy(fs.createReadStream(file_name)).lines.forEach(function(line){
+			if (!wroteHeader) {
+				response.writeHead(200, {'Content-Type': 'application/xml'});
+				wroteHeader = true;
+			}
+			
+			var line = line.toString();
+			if (line.indexOf('<Trackpoint>') != -1) {
+				// Don't advanced index for track-points with no position
+				if (lastLat != null && lastLong != null) {
+					tpIndex++;
+				}
+				
+			    lastLat = null;
+				lastLong = null;
+			} else if (line.indexOf(latElStart) != -1) {
+				var value = line.substring(line.indexOf(latElStart) + latElStart.length, line.indexOf(latElEnd));
+				lastLat = parseFloat(value);
+			} else if (line.indexOf(longElStart) != -1) {
+				var value = line.substring(line.indexOf(longElStart) + longElStart.length, line.indexOf(longElEnd));
+				lastLong = parseFloat(value);
+			} else if (line.indexOf(altStart) != -1) {
+				var value = line.substring(line.indexOf(altStart) + altStart.length, line.indexOf(altEnd));
+				var elevation = value;
+				
+				var dataLat = data.latitude[tpIndex];
+				var dataLong = data.longitude[tpIndex];
+				var dataElevation = data.uploadElevation[tpIndex];
+				
+				if (dataLat === lastLat && dataLong === lastLong && parseFloat(dataElevation) == elevation) {
+					var newElevation = data.adjustedElevation[tpIndex];
+					var replacedLine = line.replace(elevation, newElevation);
+					response.write(replacedLine);
+					replacementCount++;
+					return;
+			    }
+			}
+			
+			response.write(line.toString());
+		}).join(function() {
+			sys.debug('Exported file ' + file_id + ' with ' + replacementCount + ' adjustments.');
+			response.end();
+		});
+    })
+}
+
 function serve_static_resource(req, res, uri) {
     var filename = path.join(process.cwd(), CLIENT_PATH, uri);
     fs.exists(filename, function(exists) {
@@ -301,7 +420,7 @@ function savedParsedData(file_id, data) {
 	    if (err) {
 	        sys.error('Failed to cache parsed data for upload ' + file_id + '. ' +err);
 	    } else {
-	        sys.error('Cached parsed data for file ' + file_id);
+	        sys.debug('Cached parsed data for file ' + file_id);
 	    }
     }); 
 }

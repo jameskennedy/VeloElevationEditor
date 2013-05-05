@@ -7,6 +7,7 @@ function loadData() {
 		document.data = data;
 		updateMaps();
 		updateElevationChart();
+		setDownloadLink();
 		document.getElementById('loading');
 		loading.style.display = 'none';
 	})
@@ -82,6 +83,14 @@ function updateMaps() {
 	  });
 
     route.setMap(map);
+}
+
+function setDownloadLink() {
+    var linkEl = $( "#export_link" );
+    linkEl = document.getElementById('export_link');
+    var suffix = '_adjusted';
+    var file_name = document.data.file_name.replace(/(\.|$)/, suffix + "$&");
+    linkEl.setAttribute('href', "/export/" + file_name + "?file_id=" + document.data.file_id);
 }
 
 google.maps.event.addDomListener(window, 'load', loadData);
