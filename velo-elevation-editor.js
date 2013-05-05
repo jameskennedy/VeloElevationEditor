@@ -312,7 +312,7 @@ function calculateAdjustment(data, start, end) {
     
     var maxDeltaIndex = 0;
     var inclusionGroup = [];
-    var maxInclusion = Math.round((end - start) * 0.1);
+    var maxInclusion = Math.round((end - start) * 0.25);
     sys.debug("maxinclusion: " + maxInclusion);
     for (var i = start; i <= end; i++) {
     	var inclusionIndex = i - start;
