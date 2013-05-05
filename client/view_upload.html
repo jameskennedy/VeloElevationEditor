@@ -29,8 +29,12 @@
 
 <table>
     <tr>
-        <td><input type="radio" name="adjustmentMethod" value="EndPointShift" checked="true"/></td>
-        <td>End-Point Shift: Keep the same elevation profile that was uploaded but shift it to match start and end points with the Google elevation.</td>
+        <td><input type="radio" name="adjustmentMethod" value="FixedBestFit" checked="true"/></td>
+        <td>Fixed Best-Fit: Keep the same elevation profile that was uploaded but shift it to best fit the Google profile.</td>
+    </tr>
+    <tr>
+        <td><input type="radio" name="adjustmentMethod" value="FixedBestFitRecursive"/></td>
+        <td>Fixed Best-Fit with Partitioning: Do Fixed Best-Fit on profile partioned by detected anomolies.</td>
     </tr>
     <tr>
         <td><input type="radio" name="adjustmentMethod" value="UseGoogle"/></td>
