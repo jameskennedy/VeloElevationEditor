@@ -19,9 +19,12 @@ function loadData() {
 function updateElevationChart() {
 		var data = document.data;
 		
+		var colors = ['blue', 'red'];
+		
 		var chartData = [['Distance', 'Google Elevation', 'Uploaded Elevation']];
 		if (data.adjustedElevation) {
 		  chartData[0].push('Adjusted Elevation');
+		  colors.push('green');
 		}
 		
 		for (var i = 0; i < data.uploadElevation.length; i++) {
@@ -40,7 +43,8 @@ function updateElevationChart() {
         var options = {
           title : 'Elevation',
           hAxis: { title: 'Distance (km)'},
-          vAxis: { title: 'Elevation (m)'}
+          vAxis: { title: 'Elevation (m)'},
+          colors: colors
         }
 
         var chart = new google.visualization.LineChart(document.getElementById('elevation-canvas'));
