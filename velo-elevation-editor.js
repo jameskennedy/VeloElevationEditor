@@ -295,21 +295,61 @@ function calculateAdjustment(data, start, end) {
     var uploadElevationStop = data.uploadElevation[end];
     var googleStart = data.googleElevation[start];
     var googleStop = data.googleElevation[end];
-    
-    var fixedAdjustment = (googleStart - uploadElevationStart + googleStop - uploadElevationStop) / 2;
-    
+  
+    // Initialize adjustment data
     if (!data.adjustedElevation) {
         data.adjustedElevation = [];
+        data.elevationDelta = [];
         for (var i = 0; i < start; i++) {
             data.adjustedElevation[i] = data.uploadElevation[i];
+            data.elevationDelta[i] = 0;
         }
         for (var i = end + 1; i < data.uploadElevation.length; i++) {
             data.adjustedElevation[i] = data.uploadElevation[i];
+            data.elevationDelta[i] = 0;
         }
     }
     
+    var maxDeltaIndex = 0;
+    var inclusionGroup = [];
+    var maxInclusion = Math.round((end - start) * 0.1);
+    sys.debug("maxinclusion: " + maxInclusion);
     for (var i = start; i <= end; i++) {
-        data.adjustedElevation[i] = data.uploadElevation[i] + fixedAdjustment;
+    	var inclusionIndex = i - start;
+        var delta = data.googleElevation[i] - data.uploadElevation[i];
+        data.elevationDelta[i] = delta;
+        
+        if (inclusionIndex < maxInclusion) {
+        	inclusionGroup.push(delta);
+            if (Math.abs(delta) > Math.abs(inclusionGroup[maxDeltaIndex])) {
+            	maxDeltaIndex = inclusionIndex;
+            }
+            
+        } else {
+        	if (Math.abs(delta) < Math.abs(inclusionGroup[maxDeltaIndex])) {
+	        	inclusionGroup[maxDeltaIndex] = delta;
+	        	for (var j = 0; j < maxInclusion; j++) {
+	        		if (Math.abs(inclusionGroup[j]) > Math.abs(inclusionGroup[maxDeltaIndex])) {
+	                	maxDeltaIndex = j;
+	                }
+	        	}
+        	}
+        }
+    }
+    
+    // sys.debug(util.inspect(inclusionGroup));
+    
+    var cummulativeDelta = 0;
+    for (var i = 0; i < maxInclusion; i++) {
+    	cummulativeDelta += inclusionGroup[i];
+    } 
+
+    var fixedAdjustment = cummulativeDelta / maxInclusion;
+    sys.debug("cummulativeDelta: " + cummulativeDelta);
+    sys.debug("fixed adjustment: " + fixedAdjustment);
+    
+    for (var i = start; i <= end; i++) {
+    	data.adjustedElevation[i] = data.uploadElevation[i] + fixedAdjustment;
     } 
 }
 
