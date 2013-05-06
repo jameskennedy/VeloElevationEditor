@@ -1,11 +1,12 @@
 
 
-function loadData(adjustMode) {
+function loadData() {
 	var pathArray = window.location.pathname.split( '/' );
     var file_id = pathArray[pathArray.length -1];
     var url = '/data/' + file_id;
-    if (adjustMode) {
-        url += '?adjust_mode=' + adjustMode;
+    var adjust_mode = $("input:radio[name=adjustmentMethod]:checked").val();
+    if (adjust_mode) {
+        url += '?adjust_mode=' + adjust_mode;
     }
 	var jqxhr = $.getJSON(url, function(data) {
 		document.data = data;
@@ -46,7 +47,7 @@ function updateElevationChart() {
 
         var options = {
           title : 'Elevation',
-          hAxis: { title: 'Distance (km)'},
+          hAxis: { title: 'Distance (km)',  gridlines: {count:8}},
           vAxis: { title: 'Elevation (m)'},
           colors: colors
         }
@@ -113,9 +114,8 @@ function setDownloadLink() {
 
 function attachListeners() {
     $("input:radio[name=adjustmentMethod]").click(function() {
-        var value = $(this).val();
         setDownloadLink();
-        loadData(value);
+        loadData();
     });
 }
 
