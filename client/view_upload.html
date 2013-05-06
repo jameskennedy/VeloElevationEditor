@@ -27,20 +27,22 @@
 <div id="elevation-canvas" style="width: 60%; height: 400px;"></div>
 
 
+<form id="adjust_params">
 <table>
     <tr>
         <td><input type="radio" name="adjustmentMethod" value="FixedBestFit" checked="true"/></td>
         <td>Fixed Best-Fit: Keep the same elevation profile that was uploaded but shift it to best fit the Google profile.</td>
     </tr>
     <tr>
-        <td><input type="radio" name="adjustmentMethod" value="FixedBestFitRecursive"/></td>
-        <td>Fixed Best-Fit with Partitioning: Do Fixed Best-Fit on profile partioned by detected anomolies.</td>
+        <td><input type="radio" name="adjustmentMethod" value="FixedBestFitPartition" /></td>
+        <td>Fixed Best-Fit with Partitioning: Do Fixed Best-Fit on profile partitioned by detected anomalies.</td>
     </tr>
     <tr>
         <td><input type="radio" name="adjustmentMethod" value="UseGoogle"/></td>
         <td>Use Google: Replace the uploaded elevation with Google's</td>
     </tr>    
 </table>
+</form>
 
 
 <a id="export_link" href="/export/">Export adjusted TCX file</a>

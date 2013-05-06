@@ -37,10 +37,16 @@ var server = http.createServer(function (request, response) {
   var url_parts = url.parse(request.url, true);
   var path_name = url_parts.pathname;
   
+  var adjust_mode = url_parts.query['adjust_mode'];
+  if ((adjust_mode + '') == '[object Event]') {
+	 adjust_mode = null;
+  }
+  
   // API request of JSON data for file_id
   if (path_name.indexOf('/data/') === 0) {
  	 var file_id = path_name.substring('/data/'.length);
-  	 handleJSONDataRequest(request, response, file_id);
+ 	 
+  	 handleJSONDataRequest(request, response, file_id, adjust_mode);
   	 return;
   }
   
@@ -58,8 +64,8 @@ var server = http.createServer(function (request, response) {
   // File export
   if (path_name.indexOf('/export/') === 0) {
 	  var file_id = url_parts.query.file_id;
-	  sys.debug("Exporting file " + file_id);
-	  export_adjusted_TCX(response, file_id);
+	  sys.debug("Exporting file " + file_id + " with adjust mode " + adjust_mode);
+	  export_adjusted_TCX(response, file_id, adjust_mode);
 	  return;
   }
   
@@ -122,7 +128,7 @@ function load_meta_data(file_id) {
 
 // Fetch all relevant data including latitude, longitude, uploaded elevation, 
 // and google elevation for the given file_id as a JSON object.
-function handleJSONDataRequest(req, res, file_id) {
+function handleJSONDataRequest(req, res, file_id, adjust_mode) {
 	loadOrParseData(res, file_id, function(err, data) {
 		if (err) {
 	        sys.error(util.inspect(err));
@@ -130,7 +136,10 @@ function handleJSONDataRequest(req, res, file_id) {
 			return;
 		}
 		
-		calculateAdjustment(data, 0, data.latitude.length - 1);
+		if (!doAdjustment(res, data, adjust_mode)) {
+			return;
+		}
+		
         res.writeHead(200, {'Content-Type': 'text/javascript'});
         res.end(JSON.stringify(data));
     })
@@ -289,6 +298,27 @@ function getGoogleElevations(response, resultData, nextUnfetchedIndex, callback)
   
 }
 
+function doAdjustment(response, data, adjust_mode) {
+	// Default
+	if (!adjust_mode) {
+		adjust_mode = 'FixedBestFit';
+	}
+	
+	if (adjust_mode == 'UseGoogle') {
+		data.adjustedElevation = data.googleElevation;
+	} else if (adjust_mode == 'FixedBestFit') {
+		calculateAdjustment(data, 0, data.latitude.length - 1);
+	} else if (adjust_mode == 'FixedBestFitPartitioned') {
+		// TODO: Impl partitioning
+		calculateAdjustment(data, 0, data.latitude.length - 1);
+	} else {
+		show_error(response, 400, 'Invalid adjustment mode paramater.');
+		return false;
+	}
+	
+	return true;
+}
+
 function calculateAdjustment(data, start, end) {
     var index = start;
     var uploadElevationStart = data.uploadElevation[start];
@@ -357,7 +387,7 @@ function calculateAdjustment(data, start, end) {
  * Return the original TCX file content but with elevations replaced with
  * adjusted values.
  */
-function export_adjusted_TCX(response, file_id) {
+function export_adjusted_TCX(response, file_id, adjust_mode) {
 	var latElStart = '<LatitudeDegrees>';
 	var latElEnd = '</LatitudeDegrees>';
 	var longElStart = '<LongitudeDegrees>';
@@ -368,11 +398,13 @@ function export_adjusted_TCX(response, file_id) {
 	loadOrParseData(response, file_id, function(err, data) {
 		if (err) {
 	        sys.error(util.inspect(err));
-			show_error(res, 501, 'Internal error attempting to read parsed upload.');
+			show_error(response, 501, 'Internal error attempting to read parsed upload.');
 			return;
 		}
 		
-		calculateAdjustment(data, 0, data.latitude.length - 1);
+		if (!doAdjustment(response, data, adjust_mode)) {
+			return;
+		}
 		
 		var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
 

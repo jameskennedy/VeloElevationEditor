@@ -1,9 +1,13 @@
 
 
-function loadData() {
+function loadData(adjustMode) {
 	var pathArray = window.location.pathname.split( '/' );
     var file_id = pathArray[pathArray.length -1];
-	var jqxhr = $.getJSON( '/data/' + file_id, function(data) {
+    var url = '/data/' + file_id;
+    if (adjustMode) {
+        url += '?adjust_mode=' + adjustMode;
+    }
+	var jqxhr = $.getJSON(url, function(data) {
 		document.data = data;
 		updateMaps();
 		updateElevationChart();
@@ -53,6 +57,12 @@ function updateElevationChart() {
 
 function updateMaps() {
 	var data = document.data;
+	var map_canvas = document.getElementById('map-canvas');
+	
+	// Only render once
+	if (map_canvas.innerHTML != '') {
+	   return;
+	}
 	
 	if (!data || data.latitude.length == 0) {
 		console.error("Cannot load map with no data.");
@@ -71,7 +81,7 @@ function updateMaps() {
     	mapTypeId: google.maps.MapTypeId.TERRAIN
  	 };
 
-  	var map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
+  	var map = new google.maps.Map(map_canvas, mapOptions);
 
   	var coordinates = [];
   	
@@ -90,11 +100,24 @@ function updateMaps() {
 }
 
 function setDownloadLink() {
-    var linkEl = $( "#export_link" );
-    linkEl = document.getElementById('export_link');
+    var linkEl = document.getElementById('export_link');
     var suffix = '_adjusted';
     var file_name = document.data.file_name.replace(/(\.|$)/, suffix + "$&");
-    linkEl.setAttribute('href', "/export/" + file_name + "?file_id=" + document.data.file_id);
+    var adjust_mode = $("input:radio[name=adjustmentMethod]:checked").val();
+    var params = '';
+    if (adjust_mode) {
+        params = '&adjust_mode=' + adjust_mode;
+    }
+    linkEl.setAttribute('href', "/export/" + file_name + "?file_id=" + document.data.file_id + params);
+}
+
+function attachListeners() {
+    $("input:radio[name=adjustmentMethod]").click(function() {
+        var value = $(this).val();
+        setDownloadLink();
+        loadData(value);
+    });
 }
 
 google.maps.event.addDomListener(window, 'load', loadData);
+google.maps.event.addDomListener(window, 'load', attachListeners);
