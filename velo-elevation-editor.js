@@ -26,7 +26,7 @@ var mimeTypes = {
     "png": "image/png",
     "js": "text/javascript",
     "css": "text/css",
-    "tcx": "application/xml"};
+    "tcx": "application/tcx+xml"};
 
 
 // Wipe previous upload data on startup - DISABLED for testing
@@ -416,7 +416,7 @@ function export_adjusted_TCX(response, file_id, adjust_mode) {
 		var wroteHeader = false;
 		new lazy(fs.createReadStream(file_name)).lines.forEach(function(line){
 			if (!wroteHeader) {
-				response.writeHead(200, {'Content-Type': 'application/xml'});
+				response.writeHead(200, {'Content-Type': 'application/tcx+xml'});
 				wroteHeader = true;
 			}
 			
