@@ -75,6 +75,7 @@ var server = http.createServer(function (request, response) {
 })
 
 server.listen(PORT, HOST);
+sys.log("Started Velo Elevation Editor on " + HOST + ":" + PORT);
 
 
 // =============================================================================================
@@ -289,6 +290,3 @@ function show_error(response, errorCode, message) {
     response.write('<p>' + message + '<\p>');
   	response.end();
 }
-
-
-// http://maps.googleapis.com/maps/api/elevation/json?locations=49.31643,-123.137&sensor=true
