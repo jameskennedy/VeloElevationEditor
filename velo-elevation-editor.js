@@ -7,15 +7,12 @@ var util = require('util');
 var fs = require('fs');
 var xml2js = require("xml2js");
 var rimraf = require("rimraf");
-var polyLine = require("./PolylineEncoder");
 var lazy = require("lazy");
+
+var google = require("./lib/google");
 
 var HOST = 'localhost';
 var PORT = 8081;
-
-var GOOGLE_HOST = 'maps.googleapis.com';
-var GOOGLE_PATH = '/maps/api/elevation/json';
-var MAX_REQUEST_LOCATIONS = 512; // Google enforced limit
 var UPLOAD_DIR = 'uploads';
 var CLIENT_PATH = 'client';
 
@@ -230,72 +227,12 @@ function parseUpload(res, file_id, parse_callback) {
                 }
                 
                 nextUnfetchedIndex = Math.min(lastIndexProcessed + 1, returnData.latitude.length);
-                getGoogleElevations(res, returnData, nextUnfetchedIndex, GoogleCallback);
+                google.getGoogleElevations(res, returnData, nextUnfetchedIndex, GoogleCallback);
             }
             
-       		getGoogleElevations(res, returnData, nextUnfetchedIndex, GoogleCallback);  		
+       		google.getGoogleElevations(res, returnData, nextUnfetchedIndex, GoogleCallback);  		
 	    })
 	})
-}
-
-function getGoogleElevations(response, resultData, nextUnfetchedIndex, callback) {
-  var maxIndex = Math.min(nextUnfetchedIndex + MAX_REQUEST_LOCATIONS, resultData.latitude.length);
-  
-  sys.debug('Upload ' + resultData.file_id + ': Fetching Google data for points ' + nextUnfetchedIndex + ' to ' + maxIndex);
-  
-  var points = []; 
-  for (var i = nextUnfetchedIndex; i < maxIndex; i++) {
-  	points.push(new PolylineEncoder.latLng(resultData.latitude[i], resultData.longitude[i]));
-  }
-  
-  polylineEncoder = new PolylineEncoder(18,2,0.000000000001);
-  polyline = polylineEncoder.dpEncodeToJSON(points);
-
-  var google = http.createClient(80, GOOGLE_HOST);
-  var google_request = google.request('GET', GOOGLE_PATH + '?locations=enc:' + polyline.points + '&sensor=true');
-  var response_data = '';
-  
-  google_request.addListener('response', function (google_response) {
-    google_response.addListener('data', function(chunk) {
-   	    response_data += chunk;
-    });
-    
-    google_response.addListener('end', function() {
-      if (200 != google_response.statusCode) {
-      	var message = '<p>An unkown error occured.</p>';
-      	
-    	if (google_response.statusCode == 400) {
-    		message = '<p>Input parameters are invalid.</p>';
-    	}
-    	
-    	sys.error("Google response error: " + google_response.statusCode);
-  		show_error(response, google_response.statusCode, message);
-  		return;
-      }
-    
-      var responseObj = JSON.parse(response_data);
-      var googlePointCount = responseObj.results.length;
-      
-      sys.debug("Got a 200 OK response from google with " +  googlePointCount + ' points.');
- 
-     if (googlePointCount != points.length) {
-        sys.error('ERROR: Unexpected state: Sent ' + points.length + ' points to Google but got back ' + googlePointCount);
-        //show_error(response, 501, "My apologies, server error.");
-        //return;
-      }
-      
-      for (var i = 0; i < googlePointCount; i++) {
-        var index = nextUnfetchedIndex + i;
-      	resultData.googleElevation[index] = parseFloat(responseObj.results[i].elevation);
-      	maxIndex = index;
-      }
-      
-      callback(maxIndex, resultData);
-    });
-  });
-  
-  google_request.end(); 
-  
 }
 
 function doAdjustment(response, data, adjust_mode) {
