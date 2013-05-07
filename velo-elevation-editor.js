@@ -352,10 +352,10 @@ function fixedShiftPartitionedAdjustment(data) {
 
         } else {      
             //TODO: This is supposing that distance has been recorded via bike sensor and not GPS  
-            var horizDistance = Math.sqrt(distanceDelta * 2 + elevationDelta * 2);
+            var horizDistance = Math.sqrt(Math.pow(distanceDelta,2) - Math.pow(elevationDelta,2));
 	        var grade = 100 * elevationDelta / horizDistance;
-	        if (grade > 45 || grade < -60) {
-	            sys.debug("Suspicious grade of " + grade + " at " + distance + "km, " + elevation +"m, partitioning");
+	        if (grade > 40 || grade < -60) {
+	            sys.debug("Suspicious grade of " + grade + " at " + distance + "km, v. delta " + elevationDelta +"m, h. delta " + distanceDelta + ", partitioning");
 	            fixedShiftAdjustment(data, start, end - 1);
 	            start = end;
 	        }

@@ -47,8 +47,11 @@ function updateElevationChart() {
 
         var options = {
           title : 'Elevation',
-          hAxis: { title: 'Distance (km)',  gridlines: {count:8}},
-          vAxis: { title: 'Elevation (m)'},
+          //hAxis: { title: 'Distance (km)', gridlines: {count:8}, viewWindow: {min:40, max:45}},
+         // vAxis: { title: 'Elevation (m)', gridlines: {count:8}, viewWindow: {min:50, max:130}},
+          
+          hAxis: { title: 'Distance (km)', gridlines: {count:12}},
+          vAxis: { title: 'Elevation (m)', gridlines: {count:8}},
           colors: colors
         }
 
