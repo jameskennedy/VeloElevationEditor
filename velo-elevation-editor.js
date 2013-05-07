@@ -177,7 +177,7 @@ function parseUpload(res, file_id, parse_callback) {
     var file_name = path.join(process.cwd(), UPLOAD_DIR, file_id);
 
 	// Initialize return data-structure
-	var returnData = { file_id:file_id, latitude:[], longitude:[], uploadElevation:[], googleElevation:[], distance:[] };
+	var returnData = { file_id:file_id, latitude:[], longitude:[], uploadElevation:[], googleElevation:[], distance:[]};
 
 	// Include upload meta-data
 	var metadata = load_meta_data(file_id);
@@ -307,10 +307,9 @@ function doAdjustment(response, data, adjust_mode) {
 	if (adjust_mode == 'UseGoogle') {
 		data.adjustedElevation = data.googleElevation;
 	} else if (adjust_mode == 'FixedBestFit') {
-		calculateAdjustment(data, 0, data.latitude.length - 1);
-	} else if (adjust_mode == 'FixedBestFitPartitioned') {
-		// TODO: Impl partitioning
-		calculateAdjustment(data, 0, data.latitude.length - 1);
+		fixedShiftAdjustment(data, 0, data.latitude.length - 1);
+	} else if (adjust_mode == 'FixedBestFitPartition') {
+		fixedShiftPartitionedAdjustment(data);
 	} else {
 		show_error(response, 400, 'Invalid adjustment mode paramater.');
 		return false;
@@ -319,13 +318,60 @@ function doAdjustment(response, data, adjust_mode) {
 	return true;
 }
 
-function calculateAdjustment(data, start, end) {
-    var index = start;
-    var uploadElevationStart = data.uploadElevation[start];
-    var uploadElevationStop = data.uploadElevation[end];
-    var googleStart = data.googleElevation[start];
-    var googleStop = data.googleElevation[end];
-  
+function fixedShiftPartitionedAdjustment(data) {
+    var start = 0;
+    var end = 0;
+    
+    var lastDistance = data.distance[0];
+    var lastElevation = data.uploadElevation[0];
+    var samePointStart = null;
+    
+    for (end = 1; end < data.uploadElevation.length; end++) {
+        var distance = data.distance[end];
+        var elevation = data.uploadElevation[end];
+        
+        var distanceDelta = (distance - lastDistance) * 1000; //km > m
+        var elevationDelta = elevation - lastElevation;
+        
+        lastDistance = distance;
+        lastElevation = elevation;
+        
+        if (!distanceDelta) {    
+            
+            if (Math.abs(elevationDelta) < 5) {
+                continue;
+            }
+            
+                    
+            if (!samePointStart) {
+                samePointStart = end;
+                sys.debug("Same point elevation discrepancy of " + elevationDelta + "m at " + distance + "km, partitioning");
+                fixedShiftAdjustment(data, start, end - 1);
+                start = end;
+            }
+
+        } else {      
+            //TODO: This is supposing that distance has been recorded via bike sensor and not GPS  
+            var horizDistance = Math.sqrt(Math.pow(distanceDelta,2) - Math.pow(elevationDelta,2));
+	        var grade = 100 * elevationDelta / horizDistance;
+	        if (grade > 40 || grade < -60) {
+	            sys.debug("Suspicious grade of " + grade + " at " + distance + "km, v. delta " + elevationDelta +"m, h. delta " + distanceDelta + ", partitioning");
+	            fixedShiftAdjustment(data, start, end - 1);
+	            start = end;
+	        }
+            
+            samePointStart = null;
+	    }
+    }
+    
+    fixedShiftAdjustment(data, start, data.uploadElevation.length - 1);
+}
+
+function fixedShiftAdjustment(data, start, end, bias) {
+    if (start > end) {
+      return;
+    }
+
     // Initialize adjustment data
     if (!data.adjustedElevation) {
         data.adjustedElevation = [];
@@ -342,8 +388,7 @@ function calculateAdjustment(data, start, end) {
     
     var maxDeltaIndex = 0;
     var inclusionGroup = [];
-    var maxInclusion = Math.round((end - start) * 0.25);
-    sys.debug("maxinclusion: " + maxInclusion);
+    var maxInclusion = Math.max(1, Math.round((end - start) * 0.25));
     for (var i = start; i <= end; i++) {
     	var inclusionIndex = i - start;
         var delta = data.googleElevation[i] - data.uploadElevation[i];
@@ -375,9 +420,11 @@ function calculateAdjustment(data, start, end) {
     } 
 
     var fixedAdjustment = cummulativeDelta / maxInclusion;
-    sys.debug("cummulativeDelta: " + cummulativeDelta);
-    sys.debug("fixed adjustment: " + fixedAdjustment);
+    if (bias) {
+        fixedAdjustment += bias;
+    }
     
+    sys.debug("Fixed adjustment: From " + start + ":" +  data.distance[start] + " to " + end + ":" + data.distance[end] + " shifted " + fixedAdjustment + "m using " + maxInclusion + " min delta points");
     for (var i = start; i <= end; i++) {
     	data.adjustedElevation[i] = data.uploadElevation[i] + fixedAdjustment;
     } 
