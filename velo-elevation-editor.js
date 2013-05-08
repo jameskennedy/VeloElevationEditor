@@ -6,6 +6,7 @@ var path = require('path')
 var formidable = require('formidable')
 var util = require('util')
 var lazy = require("lazy")
+var express = require('express');
 
 var google = require("./lib/google");
 var store = require("./lib/storage");
@@ -13,7 +14,7 @@ var adjustment = require("./lib/adjustment");
 
 var HOST = 'localhost';
 var PORT = 8081;
-var CLIENT_PATH = 'client';
+var PUBLIC_PATH = 'public';
 
 var mimeTypes = {
     "html": "text/html",
@@ -27,6 +28,13 @@ var mimeTypes = {
 
 // Wipe previous upload data on startup - DISABLED for testing
 // deleteUploadDir(); 
+
+
+var app = express();
+
+app.get('/', function(request, response) {
+	
+})
 
 var server = http.createServer(function (request, response) {
   
@@ -74,7 +82,7 @@ var server = http.createServer(function (request, response) {
   
 })
 
-server.listen(PORT, HOST);
+//server.listen(PORT, HOST);
 sys.log("Started Velo Elevation Editor on " + HOST + ":" + PORT);
 
 
@@ -259,7 +267,7 @@ function export_adjusted_TCX(response, file_id, adjust_mode) {
 }
 
 function serve_static_resource(req, res, uri) {
-    var filename = path.join(process.cwd(), CLIENT_PATH, uri);
+    var filename = path.join(process.cwd(), PUBLIC_PATH, uri);
     fs.exists(filename, function(exists) {
         if(!exists) {
         	sys.log("404 Not Found - " + filename);
