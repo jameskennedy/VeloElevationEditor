@@ -1,0 +1,38 @@
+extends layout
+
+block scripts
+  script(type='text/javascript', src='/javascripts/jquery-1.9.1.min.js')
+  script(type='text/javascript', src='https://www.google.com/jsapi')
+  script
+    google.load("visualization", "1", {packages:["corechart"]});
+  script(type="text/javascript", src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCJ6Kw7wLavAtmVUWd4HuSiWr6YwMFGI8s&sensor=false")
+  script(type="text/javascript", src='/javascripts/client.js')
+        
+block content
+  h1= title
+  p Elevation profile for file #{file_id}
+  
+  a(href="/") Upload page
+
+  #loading Please wait...
+  
+  #map-canvas
+  
+  #elevation-canvas(style="width: 60%; height: 400px;")
+
+  table
+    tr
+        td
+          <input type="radio" name="adjustmentMethod" value="FixedBestFit" checked="true"/>
+        td Fixed Best-Fit: Keep the same elevation profile that was uploaded but shift it to best fit the Google profile.
+    tr
+        td <input type="radio" name="adjustmentMethod" value="FixedBestFitPartition" />
+        td Fixed Best-Fit with Partitioning: Do Fixed Best-Fit on profile partitioned by detected anomalies.
+
+    tr
+       td <input type="radio" name="adjustmentMethod" value="UseGoogle"/>
+       td Use Google: Replace the uploaded elevation with Google's
+
+
+
+  a#export_link(href='/uploads/export/') Export adjusted TCX file

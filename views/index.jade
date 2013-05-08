@@ -1,0 +1,36 @@
+extends layout
+
+block content
+  h1= title
+  p Welcome to #{title}
+  
+  p Upload a Garmin Training Center (.TCX) file to adjust elevation data.
+
+  form(action='/upload', method='post', enctype='multipart/form-data')
+    input(type='file', name='gpsdata')
+    input(type='submit', value='Upload')
+
+  p 
+    | Here is a 
+    a(href='resources/activity_306864945.tcx') sample TCX file
+    |  you can upload.
+
+  p For the sample, this is what you'll see:
+    img(src='resources/ExampleElevation.png')
+
+  p In this case, the uploaded elevation profile almost matches the geographic database (Google) profile except that
+    the GPS start-point was way off (always is when I start among buildings in the city).
+
+  p Another difference is highlighted by the green circle. That is the Dunsmuir Viaduct, an over-pass.
+    While my Garmin 500 accurately caught the over-pass elevation with it's barometric altimeter, 
+    Google's elevation matches the ground below the over-pass.
+
+  p The yellow "Adjusted Elevation" keeps the over-pass and the rest of the actual recorded profile but shifts
+    it up so that the start and end points better match Google's geographic profile. This elevation takes the
+    best of the other two.
+
+  p The "Adjusted Elevation" version of your uploaded file is available for download.
+    | Now you can upload more accurate data to 
+    a(href='http://connect.garmin.com/') Garmin Connect
+    |  or 
+    a(href='http://app.strava.com/') Strava
