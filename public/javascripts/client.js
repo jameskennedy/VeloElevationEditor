@@ -64,9 +64,10 @@ function updateMaps() {
 	var map_canvas = document.getElementById('map-canvas');
 	
 	// Only render once
-	if (map_canvas.innerHTML != '') {
+	if (document.mapRendered) {
 	   return;
 	}
+	document.mapRendered = true;
 	
 	if (!data || data.latitude.length == 0) {
 		console.error("Cannot load map with no data.");
