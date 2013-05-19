@@ -5,7 +5,8 @@
   "description": "An editor for adjusting route elevation data.",
   "main": "app.js",
   "scripts": {
-    "start": "./app.js"
+    "start": "./app.js",
+    "test": "make test"
   },
   "repository": "",
   "keywords": [
@@ -16,6 +17,11 @@
   "author": "jk-public@hunterkennedy.ca",
   "license": "BSD",
   "readmeFilename": "README.md",
+  "scripts": {
+  },
+  "devDependencies": {
+    "mocha": "0.3.x"
+  },
   "dependencies": {
     "express": "3.2.3",
     "jade": "*",
